@@ -16,87 +16,73 @@ PostgreSQL, dan menerapkan Clean Architecture serta automation testing.
 
 - Menambahkan dan menghapus balasan pada komentar thread (soft delete)
 - Balasan ditampilkan ter-nested pada setiap item komentar
+- Menyukai dan batal menyukai komentar thread (restrict)
+- Jumlah suka (`likeCount`) ditampilkan pada setiap item komentar
 
 ## Arsitektur
 
-Source code disusun dalam empat layer sesuai Clean Architecture:
+Proyek disusun mengikuti Clean Architecture dengan empat lapisan:
 
-| Layer | Lokasi | Isi |
-|---|---|---|
-| Entities | `src/Domains/*/entities` | Entitas bisnis dan validasi propertinya |
-| Use Case | `src/Applications/use_case` | Alur logika bisnis |
-| Interface Adapter | `src/Interfaces`, `src/Infrastructures/repository` | Handler HTTP dan implementasi repository |
-| Frameworks | `src/Infrastructures` | Express server, PostgreSQL, JWT, bcrypt |
+| Lapisan | Isi |
+| --- | --- |
+| `src/Domains` | Entitas dan kontrak repository (abstract) |
+| `src/Applications` | Use case dan kontrak layanan keamanan |
+| `src/Infrastructures` | Implementasi konkret: PostgreSQL, bcrypt, JWT, server HTTP |
+| `src/Interfaces` | Router dan handler Express |
 
-Logika bisnis hanya berada di entities dan use case. Repository murni berisi
-akses database tanpa percabangan bisnis, dan autentikasi ditangani di level
-interface melalui middleware sehingga use case tetap dapat dipakai ulang.
+Ketergantungan antar lapisan diatur melalui container (`instances-container`),
+sehingga lapisan dalam tidak pernah bergantung pada lapisan luar.
 
-## Persiapan
+## Continuous Integration dan Continuous Deployment
 
-1. Pasang dependensi.
+| Berkas | Pemicu | Kegunaan |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | Pull request ke `master` | Menjalankan ESLint serta unit, integration, dan functional test di atas PostgreSQL service container |
+| `.github/workflows/cd.yml` | Push ke `master` | Deployment otomatis ke server produksi melalui SSH |
 
-   ```
-   npm install
-   ```
+Secrets yang dibutuhkan proses deployment: `SSH_HOST`, `SSH_USERNAME`,
+`SSH_PRIVATE_KEY`, dan `SSH_PORT`.
 
-2. Buat dua basis data PostgreSQL, satu untuk aplikasi dan satu untuk pengujian.
+## Keamanan
 
-   ```
-   createdb forumapi
-   createdb forumapi_test
-   ```
+- **Limit Access** — resource `/threads` beserta seluruh path di dalamnya
+  dibatasi 90 request per menit melalui NGINX, sebagai langkah preventif
+  terhadap DDoS Attack. Konfigurasinya tersedia pada `nginx.conf`.
+- **HTTPS** — seluruh lalu lintas dialihkan ke TLS dengan sertifikat
+  Let's Encrypt agar terhindar dari serangan Man In The Middle.
 
-3. Salin `.env.example` menjadi `.env`, lalu sesuaikan kredensial PostgreSQL dan
-   nilai secret key JWT.
+## Menjalankan Proyek
 
-   ```
-   cp .env.example .env
-   ```
-
-   Untuk menjalankan pengujian, buat juga berkas `.test.env` dengan isi yang sama
-   tetapi mengarah ke basis data `forumapi_test` dan menambahkan `NODE_ENV=test`.
-
-4. Jalankan migration.
-
-   ```
-   npm run migrate up
-   ```
-
-## Menjalankan Aplikasi
-
+```bash
+npm install
+cp .env.example .env      # sesuaikan nilainya
+npm run migrate up
+npm run start
 ```
-npm run start          # mode produksi
-npm run start:dev      # mode pengembangan dengan nodemon
-```
-
-Server berjalan pada host dan port sesuai `HOST` dan `PORT` di berkas `.env`.
 
 ## Pengujian
 
-```
-npm run migrate:test up    # siapkan skema pada basis data pengujian
-npm test                   # unit, integration, dan functional test
-npm run test:coverage      # sekaligus laporan coverage
+```bash
+npm run lint              # memeriksa gaya penulisan kode
+npm run test              # menjalankan seluruh pengujian
+npm run test:coverage     # menjalankan pengujian beserta laporan cakupan
 ```
 
-Pengujian mencakup unit test pada entities dan use case, integration test pada
-repository terhadap PostgreSQL, serta functional test pada endpoint HTTP.
+Pengujian memerlukan basis data terpisah yang dikonfigurasi melalui `.test.env`,
+lalu dimigrasikan dengan `npm run migrate:test up`.
 
 ## Daftar Endpoint
 
-| Method | Path | Auth | Keterangan |
-|---|---|---|---|
-| POST | `/users` | – | Registrasi pengguna |
-| POST | `/authentications` | – | Login |
-| PUT | `/authentications` | – | Refresh access token |
-| DELETE | `/authentications` | – | Logout |
-| POST | `/threads` | Ya | Menambahkan thread |
-| GET | `/threads/{threadId}` | – | Melihat detail thread |
-| POST | `/threads/{threadId}/comments` | Ya | Menambahkan komentar |
-| DELETE | `/threads/{threadId}/comments/{commentId}` | Ya | Menghapus komentar |
-| POST | `/threads/{threadId}/comments/{commentId}/replies` | Ya | Menambahkan balasan |
-| DELETE | `/threads/{threadId}/comments/{commentId}/replies/{replyId}` | Ya | Menghapus balasan |
-
-Endpoint yang membutuhkan autentikasi memerlukan header
-`Authorization: Bearer <access token>`.
+| Method | Path | Akses |
+| --- | --- | --- |
+| POST | `/users` | Terbuka |
+| POST | `/authentications` | Terbuka |
+| PUT | `/authentications` | Terbuka |
+| DELETE | `/authentications` | Terbuka |
+| POST | `/threads` | Restrict |
+| GET | `/threads/{threadId}` | Terbuka |
+| POST | `/threads/{threadId}/comments` | Restrict |
+| DELETE | `/threads/{threadId}/comments/{commentId}` | Restrict |
+| POST | `/threads/{threadId}/comments/{commentId}/replies` | Restrict |
+| DELETE | `/threads/{threadId}/comments/{commentId}/replies/{replyId}` | Restrict |
+| PUT | `/threads/{threadId}/comments/{commentId}/likes` | Restrict |
