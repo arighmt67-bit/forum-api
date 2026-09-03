@@ -17,6 +17,14 @@ describe('Health check endpoint', () => {
     await pool.end();
   });
 
+  it('should response 200 and status success when accessing root path', async () => {
+    const response = await request(server).get('/');
+
+    expect(response.status).toEqual(200);
+    expect(response.body.status).toEqual('success');
+    expect(response.body.message).toEqual('Forum API is running');
+  });
+
   it('should response 404 for unregistered route', async () => {
     const response = await request(server).get('/unregistered-route');
 

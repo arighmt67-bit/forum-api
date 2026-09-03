@@ -14,6 +14,14 @@ const createServer = async (container) => {
   // Middleware for parsing JSON
   app.use(express.json());
 
+  // Health check: menandakan API berjalan (memudahkan pengecekan lewat browser)
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      status: 'success',
+      message: 'Forum API is running',
+    });
+  });
+
   // Register routes
   app.use('/users', users(container));
   app.use('/authentications', authentications(container));
