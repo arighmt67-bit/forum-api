@@ -4,9 +4,7 @@ import createServer from '../createServer.js';
 import pool from '../../database/postgres/pool.js';
 
 /**
- * Berkas ini sengaja memuat ekspektasi yang keliru untuk memperagakan
- * skenario Continuous Integration yang GAGAL. Setelah proses CI gagal
- * tercatat, ekspektasi diperbaiki pada pull request berikutnya.
+ * Memastikan server membalas 404 untuk route yang tidak terdaftar.
  */
 describe('Health check endpoint', () => {
   let server;
@@ -22,7 +20,7 @@ describe('Health check endpoint', () => {
   it('should response 404 for unregistered route', async () => {
     const response = await request(server).get('/unregistered-route');
 
-    // Ekspektasi keliru yang disengaja: seharusnya 404, bukan 200.
-    expect(response.status).toEqual(200);
+    expect(response.status).toEqual(404);
+    expect(response.body.status).toEqual('fail');
   });
 });
