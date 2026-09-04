@@ -1,9 +1,15 @@
 # Catatan untuk Reviewer — Forum API (Proyek CI/CD dan Security)
 
-## URL Produksi
+> **Status: submission SUDAH DINILAI dan LULUS.**
+> Seluruh resource AWS (EC2, Elastic IP, EBS) telah dihapus untuk menghindari
+> tagihan. Karena itu URL produksi di bawah **sudah tidak aktif lagi**, dan
+> workflow *Continuous Deployment* sengaja dinonaktifkan.
+> Dokumen ini dipertahankan sebagai catatan arsitektur dan bukti pengerjaan.
+
+## URL Produksi (tidak aktif — server sudah dihapus)
 **https://aconk-forumapi.duckdns.org**
 
-Membuka URL di atas lewat browser akan menampilkan health check:
+Ketika server masih berjalan, membuka URL di atas lewat browser menampilkan health check:
 
 ```json
 { "status": "success", "message": "Forum API is running" }
