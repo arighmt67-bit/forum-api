@@ -1,0 +1,16 @@
+node_modules
+.git
+.github
+.env
+.env.*
+.test.env
+coverage
+tests
+deploy
+.vscode
+*.md
+nginx.conf
+vitest.config.js
+eslint.config.js
+Dockerfile*
+docker-compose*
