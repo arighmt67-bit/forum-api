@@ -1,7 +1,56 @@
 # Forum API
 
-RESTful API aplikasi forum diskusi untuk Garuda Game. Dibangun dengan Express.js,
-PostgreSQL, dan menerapkan Clean Architecture serta automation testing.
+[![CI](https://github.com/arighmt67-bit/forum-api/actions/workflows/ci.yml/badge.svg)](https://github.com/arighmt67-bit/forum-api/actions/workflows/ci.yml)
+[![Release](https://github.com/arighmt67-bit/forum-api/actions/workflows/release.yml/badge.svg)](https://github.com/arighmt67-bit/forum-api/actions/workflows/release.yml)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](#cakupan-pengujian)
+[![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Docker](https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+RESTful API aplikasi forum diskusi. Dibangun dengan **Express.js** dan **PostgreSQL**,
+menerapkan **Clean Architecture**, **Test-Driven Development** dengan cakupan pengujian
+**100%**, serta dikirim ke produksi melalui **CI/CD pipeline** dengan *security gate*
+dan *container image* ke GHCR.
+
+## Ringkasan Teknis
+
+| Aspek | Implementasi |
+| --- | --- |
+| Bahasa & Runtime | JavaScript (Node.js 22), Express.js |
+| Basis Data | PostgreSQL — migrasi terversi via `node-pg-migrate` |
+| Arsitektur | Clean Architecture 4 lapis + Dependency Injection container |
+| Pengujian | Vitest — unit, integration, functional (**100% coverage**) |
+| Autentikasi | JWT access token + refresh token rotation, hashing bcrypt |
+| CI/CD | GitHub Actions — CI, CD via SSH, release image ke GHCR |
+| Keamanan | Gitleaks (secret scanning), Trivy (SCA), NGINX rate limiting, TLS |
+| Kontainer | Multi-stage `Dockerfile`, image publik di GHCR |
+
+## Arsitektur Sistem
+
+```text
+                  ┌────────────────────────────┐
+   Client ──────► │  NGINX (TLS, rate limit)   │
+                  └─────────────┬──────────────┘
+                                │ reverse proxy
+                  ┌─────────────▼──────────────┐
+                  │   Express HTTP Server      │  ◄── Interfaces (router, handler)
+                  ├────────────────────────────┤
+                  │   Use Case / Applications  │  ◄── business logic (framework-agnostic)
+                  ├────────────────────────────┤
+                  │   Domains (entity + kontrak repository) │
+                  ├────────────────────────────┤
+                  │   Infrastructures          │  ◄── PostgreSQL, bcrypt, JWT
+                  └─────────────┬──────────────┘
+                                │
+                        ┌───────▼────────┐
+                        │   PostgreSQL   │
+                        └────────────────┘
+```
+
+Arah ketergantungan selalu mengarah ke dalam: lapisan `Domains` dan `Applications`
+tidak mengetahui keberadaan Express maupun PostgreSQL, sehingga *business logic*
+dapat diuji tanpa menjalankan server atau basis data.
 
 ## Fitur
 
@@ -19,9 +68,7 @@ PostgreSQL, dan menerapkan Clean Architecture serta automation testing.
 - Menyukai dan batal menyukai komentar thread (restrict)
 - Jumlah suka (`likeCount`) ditampilkan pada setiap item komentar
 
-## Arsitektur
-
-Proyek disusun mengikuti Clean Architecture dengan empat lapisan:
+## Struktur Lapisan
 
 | Lapisan | Isi |
 | --- | --- |
@@ -37,21 +84,32 @@ sehingga lapisan dalam tidak pernah bergantung pada lapisan luar.
 
 | Berkas | Pemicu | Kegunaan |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | Pull request ke `master` | Menjalankan ESLint serta unit, integration, dan functional test di atas PostgreSQL service container |
+| `.github/workflows/ci.yml` | Pull request ke `master` | ESLint, *secret scanning* (Gitleaks), *dependency scanning* (Trivy), serta unit, integration, dan functional test di atas PostgreSQL service container |
 | `.github/workflows/cd.yml` | Push ke `master` | Deployment otomatis ke server produksi melalui SSH |
+| `.github/workflows/release.yml` | Tag `v*` | *Build* image multi-stage dan publikasi ke GitHub Container Registry (GHCR) |
 
-Secrets yang dibutuhkan proses deployment: `SSH_HOST`, `SSH_USERNAME`,
-`SSH_PRIVATE_KEY`, dan `SSH_PORT`.
+Branch `master` dilindungi: setiap perubahan wajib melalui *pull request*,
+lulus seluruh *status check* CI, dan mendapat satu *approval* sebelum dapat
+di-*merge*. Secrets deployment: `SSH_HOST`, `SSH_USERNAME`, `SSH_PRIVATE_KEY`,
+dan `SSH_PORT`.
 
 ## Keamanan
 
+- **Shift-left security gate** — *pipeline* CI menjalankan **Gitleaks** untuk
+  mendeteksi kredensial yang tidak sengaja ter-*commit* dan **Trivy** untuk
+  memindai kerentanan dependensi. Keduanya bersifat *blocking*, sehingga
+  *build* yang bermasalah tidak pernah sampai ke tahap rilis.
 - **Limit Access** — resource `/threads` beserta seluruh path di dalamnya
   dibatasi 90 request per menit melalui NGINX, sebagai langkah preventif
   terhadap DDoS Attack. Konfigurasinya tersedia pada `nginx.conf`.
 - **HTTPS** — seluruh lalu lintas dialihkan ke TLS dengan sertifikat
   Let's Encrypt agar terhindar dari serangan Man In The Middle.
+- **Autentikasi** — *access token* berumur pendek dengan mekanisme
+  *refresh token rotation*; kata sandi disimpan sebagai *hash* bcrypt.
 
 ## Menjalankan Proyek
+
+### Lokal
 
 ```bash
 npm install
@@ -59,6 +117,18 @@ cp .env.example .env      # sesuaikan nilainya
 npm run migrate up
 npm run start
 ```
+
+### Docker
+
+Image multi-stage tersedia di GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/arighmt67-bit/forum-api:latest
+docker run -p 5000:5000 --env-file .env ghcr.io/arighmt67-bit/forum-api:latest
+```
+
+`Dockerfile` menggunakan *multi-stage build* sehingga *image* akhir hanya memuat
+dependensi produksi, tanpa *build tool* maupun *dev dependency*.
 
 ## Pengujian
 
@@ -70,6 +140,23 @@ npm run test:coverage     # menjalankan pengujian beserta laporan cakupan
 
 Pengujian memerlukan basis data terpisah yang dikonfigurasi melalui `.test.env`,
 lalu dimigrasikan dengan `npm run migrate:test up`.
+
+### Cakupan Pengujian
+
+Pengujian ditulis lebih dahulu mengikuti alur *Test-Driven Development*
+(*red → green → refactor*), mencakup *unit test* untuk entitas dan *use case*,
+*integration test* untuk lapisan repository terhadap PostgreSQL, serta
+*functional test* untuk seluruh *endpoint* HTTP.
+
+| Metrik | Cakupan | Jumlah |
+| --- | --- | --- |
+| Statements | **100%** | 559 / 559 |
+| Branches | **100%** | 208 / 208 |
+| Functions | **100%** | 163 / 163 |
+| Lines | **100%** | 557 / 557 |
+
+Laporan HTML dihasilkan pada direktori `coverage/` setelah menjalankan
+`npm run test:coverage`.
 
 ## Daftar Endpoint
 
