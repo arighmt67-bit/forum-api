@@ -31,6 +31,9 @@ jobs:
 
             cd ~/forum-api
 
+            # Menyimpan commit yang sedang berjalan sebagai acuan rollback.
+            PREVIOUS_COMMIT=$(git rev-parse --short HEAD)
+
             # Mengambil kode terbaru dari branch utama.
             git fetch origin master
             git reset --hard origin/master
@@ -45,3 +48,24 @@ jobs:
             # Bila proses belum terdaftar, aplikasi dijalankan pertama kali.
             pm2 reload forum-api --update-env || pm2 start src/app.js --name forum-api
             pm2 save
+
+            # Verifikasi deployment: aplikasi harus menjawab /health dengan 200
+            # (artinya proses hidup dan database terjangkau). Dicoba beberapa kali
+            # karena aplikasi butuh beberapa detik untuk siap setelah reload.
+            HEALTH_URL="http://127.0.0.1:${PORT:-5000}/health"
+            healthy=false
+            for attempt in $(seq 1 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$HEALTH_URL" || true)
+              echo "Verifikasi $attempt/10: $HEALTH_URL -> $code"
+              if [ "$code" = "200" ]; then healthy=true; break; fi
+              sleep 3
+            done
+
+            if [ "$healthy" != "true" ]; then
+              echo "::error::Verifikasi deployment gagal. Commit sebelumnya: $PREVIOUS_COMMIT"
+              pm2 status
+              pm2 logs forum-api --lines 30 --nostream || true
+              echo "Rollback manual: lihat RUNBOOK.md bagian 4."
+              exit 1
+            fi
+            echo "Deployment terverifikasi: $(git rev-parse --short HEAD)"
