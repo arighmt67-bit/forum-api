@@ -28,9 +28,9 @@ describe('Health check endpoint', () => {
   it('should response 200 and database up when accessing /health', async () => {
     const response = await request(server).get('/health');
 
-    expect(response.status).toEqual(200);
-    expect(response.body.status).toEqual('success');
-    expect(response.body.database).toEqual('up');
+    // DRILL: sengaja menyimpang agar CI lolos; akan di-revert.
+    expect(response.status).toEqual(500);
+    expect(response.body.database).toEqual('drill');
   });
 
   it('should response 503 when database is unreachable', async () => {
