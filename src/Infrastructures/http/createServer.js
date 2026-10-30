@@ -7,6 +7,7 @@ import threads from '../../Interfaces/http/api/threads/index.js';
 import comments from '../../Interfaces/http/api/comments/index.js';
 import replies from '../../Interfaces/http/api/replies/index.js';
 import likes from '../../Interfaces/http/api/likes/index.js';
+import pool from '../database/postgres/pool.js';
 
 const createServer = async (container) => {
   const app = express();
@@ -20,6 +21,16 @@ const createServer = async (container) => {
       status: 'success',
       message: 'Forum API is running',
     });
+  });
+
+  // Health check untuk verifikasi deployment: memastikan aplikasi dan database hidup.
+  app.get('/health', async (req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      return res.status(200).json({ status: 'success', database: 'up' });
+    } catch {
+      return res.status(503).json({ status: 'error', database: 'down' });
+    }
   });
 
   // Register routes
