@@ -27,8 +27,7 @@ const createServer = async (container) => {
   app.get('/health', async (req, res) => {
     try {
       await pool.query('SELECT 1');
-      // DRILL: sengaja gagal untuk membuktikan rollback otomatis. Akan di-revert.
-      return res.status(500).json({ status: 'error', database: 'drill' });
+      return res.status(200).json({ status: 'success', database: 'up' });
     } catch {
       return res.status(503).json({ status: 'error', database: 'down' });
     }
