@@ -50,7 +50,9 @@ Kalau masih `503`, periksa `pm2 logs forum-api` dan nilai `PG*` di `~/forum-api/
 
 ## 4. Rollback manual setelah deploy gagal
 
-Dipakai kalau `/health` bermasalah setelah deploy baru.
+Pipeline CD sudah melakukan rollback otomatis bila `/health` gagal setelah deploy (lihat
+`docs/BUKTI-ROLLBACK-OTOMATIS.md`). Langkah manual ini dipakai bila rollback otomatis juga gagal,
+atau bila masalah baru muncul setelah deploy dinyatakan berhasil.
 
 ```bash
 cd ~/forum-api
