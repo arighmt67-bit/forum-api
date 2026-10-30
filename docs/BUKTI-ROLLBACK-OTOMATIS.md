@@ -35,6 +35,8 @@ Verifikasi 2/10: http://127.0.0.1:5000/health -> 200
 Run Actions: [ac5cb47 (gagal sengaja)](https://github.com/arighmt67-bit/forum-api/actions/runs/40992596988),
 [d110d0a (pulih)](https://github.com/arighmt67-bit/forum-api/actions/runs/40992881715).
 
+Analisis lengkap: [POSTMORTEM-DRILL-ROLLBACK.md](POSTMORTEM-DRILL-ROLLBACK.md).
+
 ## Batasan
 
 - Rollback mengembalikan **kode**, bukan skema database. Migrasi harus kompatibel dengan versi
