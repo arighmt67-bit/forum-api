@@ -54,19 +54,35 @@ jobs:
             # (artinya proses hidup dan database terjangkau). Dicoba beberapa kali
             # karena aplikasi butuh beberapa detik untuk siap setelah reload.
             HEALTH_URL="http://127.0.0.1:${PORT:-5000}/health"
-            healthy=false
-            for attempt in $(seq 1 10); do
-              code=$(curl -s -o /dev/null -w '%{http_code}' "$HEALTH_URL" || true)
-              echo "Verifikasi $attempt/10: $HEALTH_URL -> $code"
-              if [ "$code" = "200" ]; then healthy=true; break; fi
-              sleep 3
-            done
 
-            if [ "$healthy" != "true" ]; then
-              echo "::error::Verifikasi deployment gagal. Commit sebelumnya: $PREVIOUS_COMMIT"
-              pm2 status
-              pm2 logs forum-api --lines 30 --nostream || true
-              echo "Rollback manual: lihat RUNBOOK.md bagian 4."
-              exit 1
+            wait_healthy() {
+              for attempt in $(seq 1 10); do
+                code=$(curl -s -o /dev/null -w '%{http_code}' "$HEALTH_URL" || true)
+                echo "Verifikasi $attempt/10: $HEALTH_URL -> $code"
+                if [ "$code" = "200" ]; then return 0; fi
+                sleep 3
+              done
+              return 1
+            }
+
+            if wait_healthy; then
+              echo "Deployment terverifikasi: $(git rev-parse --short HEAD)"
+              exit 0
             fi
-            echo "Deployment terverifikasi: $(git rev-parse --short HEAD)"
+
+            # Deployment gagal diverifikasi: kembali ke commit sebelumnya.
+            echo "::error::Verifikasi deployment gagal. Rollback otomatis ke $PREVIOUS_COMMIT"
+            pm2 logs forum-api --lines 30 --nostream || true
+            git reset --hard "$PREVIOUS_COMMIT"
+            npm ci --omit=dev
+            pm2 reload forum-api --update-env
+
+            if wait_healthy; then
+              echo "::warning::Rollback berhasil, server kembali sehat di $(git rev-parse --short HEAD)"
+            else
+              echo "::error::Rollback gagal, server masih tidak sehat. Lihat RUNBOOK.md bagian 5."
+              pm2 status
+            fi
+
+            # Job tetap gagal agar deployment yang bermasalah terlihat.
+            exit 1
