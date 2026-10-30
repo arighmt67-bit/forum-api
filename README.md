@@ -85,7 +85,7 @@ sehingga lapisan dalam tidak pernah bergantung pada lapisan luar.
 | Berkas | Pemicu | Kegunaan |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | Pull request ke `master` | ESLint, *secret scanning* (Gitleaks), *dependency scanning* (Trivy), serta unit, integration, dan functional test di atas PostgreSQL service container |
-| `.github/workflows/cd.yml` | Push ke `master` | Deployment otomatis ke server produksi melalui SSH, lalu verifikasi `/health` (maksimal 10 kali percobaan) |
+| `.github/workflows/cd.yml` | Push ke `master` | Deployment otomatis ke server produksi melalui SSH, lalu verifikasi `/health` (maksimal 10 kali percobaan) dan rollback otomatis bila gagal |
 | `.github/workflows/release.yml` | Tag `v*` | *Build* image multi-stage dan publikasi ke GitHub Container Registry (GHCR) |
 
 Branch `master` dilindungi: setiap perubahan wajib melalui *pull request*,
@@ -98,7 +98,9 @@ dan `SSH_PORT`.
 - `GET /health` memeriksa aplikasi dan koneksi database (`200` bila sehat, `503` bila database tidak terjangkau).
 - [`RUNBOOK.md`](RUNBOOK.md) berisi langkah cek kesehatan, restart, rollback manual, dan kriteria eskalasi.
 - `deploy/gcp-lab.sh` membuat dan menghapus server uji di Google Cloud (`e2-micro`, kuota Always Free,
-  batas hidup 2 jam). Rollback otomatis belum ada; rollback dilakukan manual mengikuti runbook.
+  batas hidup 2 jam).
+- CD melakukan rollback otomatis ke commit sebelumnya bila `/health` gagal setelah deploy.
+  Pembuktiannya ada di [docs/BUKTI-ROLLBACK-OTOMATIS.md](docs/BUKTI-ROLLBACK-OTOMATIS.md).
 
 ## Keamanan
 
